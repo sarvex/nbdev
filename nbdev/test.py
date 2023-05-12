@@ -24,7 +24,7 @@ class _ReTstFlags():
         "Compile at first use but not before since patterns need `get_config().tst_flags`"
         if hasattr(self, '_re'): return
         tst_flags = get_config().get('tst_flags', '')
-        tst_flags += f'|skip' if tst_flags else 'skip'
+        tst_flags += '|skip' if tst_flags else 'skip'
         _re_all = 'all_' if self.all_flag else ''
         self._re = _mk_flag_re(f"{_re_all}({tst_flags})", 0, "Any line with a test flag")
 
@@ -110,7 +110,7 @@ def nbdev_test_nbs(
     if flags is not None: flags = flags.split(' ')
     files = nbglob(fname)
     files = [Path(f).absolute() for f in sorted(files)]
-    assert len(files) > 0, "No files to test found."
+    assert files, "No files to test found."
     if n_workers is None: n_workers = 0 if len(files)==1 else min(num_cpus(), 8)
     # make sure we are inside the notebook folder of the project
     os.chdir(get_config().path("nbs_path"))

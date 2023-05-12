@@ -43,8 +43,7 @@ def try_external_doc_link(name, packages):
     for p in packages:
         try:
             mod = importlib.import_module(f"{p}._nbdev")
-            try_pack = source_nb(name, is_name=True, mod=mod)
-            if try_pack:
+            if try_pack := source_nb(name, is_name=True, mod=mod):
                 page = re_digits_first.sub('', try_pack).replace('.ipynb', '')
                 return f'{mod.doc_url}{page}#{name}'
         except ModuleNotFoundError: return None
@@ -52,9 +51,10 @@ def try_external_doc_link(name, packages):
 # Cell
 def is_doc_name(name):
     "Test if `name` corresponds to a notebook that could be converted to a doc page"
-    for f in get_config().path("nbs_path").glob(f'*{name}.ipynb'):
-        if re_digits_first.sub('', f.name) == f'{name}.ipynb': return True
-    return False
+    return any(
+        re_digits_first.sub('', f.name) == f'{name}.ipynb'
+        for f in get_config().path("nbs_path").glob(f'*{name}.ipynb')
+    )
 
 # Cell
 def doc_link(name, include_bt=True):
@@ -63,9 +63,7 @@ def doc_link(name, include_bt=True):
     try:
         #Link to modules
         if is_lib_module(name) and is_doc_name(name): return f"[{cname}]({get_config().doc_baseurl}{name}.html)"
-        #Link to local functions
-        try_local = source_nb(name, is_name=True)
-        if try_local:
+        if try_local := source_nb(name, is_name=True):
             page = re_digits_first.sub('', try_local).replace('.ipynb', '')
             return f'[{cname}]({get_config().doc_baseurl}{page}.html#{name})'
         ##Custom links
@@ -181,13 +179,13 @@ def _format_annos(anno, highlight=False):
 def type_repr(t):
     "Representation of type `t` (in a type annotation)"
     if (isinstance(t, Param)): return f'"{t.help}"'
-    if getattr(t, '__args__', None):
-        args = t.__args__
-        if len(args)==2 and args[1] == type(None):
-            return f'`Optional`\[{type_repr(args[0])}\]'
-        reprs = ', '.join([_format_annos(o, highlight=True) for o in args])
-        return f'{doc_link(get_name(t))}\[{reprs}\]'
-    else: return doc_link(_format_annos(t))
+    if not getattr(t, '__args__', None):
+        return doc_link(_format_annos(t))
+    args = t.__args__
+    if len(args)==2 and args[1] == type(None):
+        return f'`Optional`\[{type_repr(args[0])}\]'
+    reprs = ', '.join([_format_annos(o, highlight=True) for o in args])
+    return f'{doc_link(get_name(t))}\[{reprs}\]'
 
 # Cell
 _arg_prefixes = {inspect._VAR_POSITIONAL: '\*', inspect._VAR_KEYWORD:'\*\*'}
@@ -261,8 +259,12 @@ def _generate_arg_string(argument_dict, has_docment=False, monospace=False):
             is_required = False
         arg_string += f"|**`{key}`**|"
         details_string = ""
-        if item['anno'] == None: item['anno'] = NoneType
-        if (item["default"] == None and item['anno'] == NoneType) or item['anno'] == inspect._empty:
+        if item['anno'] is None: item['anno'] = NoneType
+        if (
+            item["default"] is None
+            and item['anno'] == NoneType
+            or item['anno'] == inspect._empty
+        ):
             details_string += "|"
         else:
             details_string += f"`{_format_annos(item['anno']).replace('|', 'or')}`|"
@@ -309,7 +311,7 @@ def _format_args(elt, ment_dict:dict = None, kwargs = [], monospace=False):
             arg_string += _generate_arg_string(kwarg_dict, has_docment, monospace=monospace).replace("||Type|Default|Details|\n|---|---|---|---|\n", "")
         else:
             arg_string = _generate_arg_string(ment_dict, has_docment, monospace=monospace)
-    if not ret["anno"] == inspect._empty:
+    if ret["anno"] != inspect._empty:
         return_string = _generate_return_string(ret, has_docment)
     return arg_string + return_string
 
@@ -319,11 +321,11 @@ def is_source_available(
 ):
     "Checks if it is possible to return the source code of `elt` mimicking `inspect.getfile`"
     if inspect.ismodule(elt):
-        return True if getattr(object, '__file__', None) else False
+        return bool(getattr(object, '__file__', None))
     elif isclass(elt):
         if hasattr(elt, '__module__'):
             module = sys.modules.get(elt.__module__)
-            return True if getattr(module, '__file__', None) else False
+            return bool(getattr(module, '__file__', None))
     elif getattr(elt, '__name__', None) == "<lambda>":
         return False
     elif inspect.ismethod(elt) or inspect.isfunction(elt) or inspect.istraceback(elt) or inspect.isframe(elt) or inspect.iscode(elt):
@@ -407,8 +409,7 @@ def get_doc_link(func):
     module = mod.__name__.replace('.', '/') + '.py'
     try:
         nbdev_mod = importlib.import_module(mod.__package__.split('.')[0] + '._nbdev')
-        try_pack = source_nb(func, mod=nbdev_mod)
-        if try_pack:
+        if try_pack := source_nb(func, mod=nbdev_mod):
             page = '.'.join(try_pack.partition('_')[-1:]).replace('.ipynb', '')
             return f'{nbdev_mod.doc_url}{page}#{qual_name(func)}'
     except: return None

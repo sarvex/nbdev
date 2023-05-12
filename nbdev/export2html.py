@@ -45,8 +45,12 @@ class HTMLParseAttrs(HTMLParser):
 def remove_widget_state(cell):
     "Remove widgets in the output of `cells`"
     if cell['cell_type'] == 'code' and 'outputs' in cell:
-        cell['outputs'] = [l for l in cell['outputs']
-                           if not ('data' in l and 'application/vnd.jupyter.widget-view+json' in l.data)]
+        cell['outputs'] = [
+            l
+            for l in cell['outputs']
+            if 'data' not in l
+            or 'application/vnd.jupyter.widget-view+json' not in l.data
+        ]
     return cell
 
 # Cell
@@ -147,7 +151,7 @@ def _img2jkl(d, h, jekyll=True):
     else:
         if 'width' in d: d['style'] = f'max-width: {d.get("width")}px'
         d.pop('align','')
-        return '<img ' + h.attrs2str() + '>'
+        return f'<img {h.attrs2str()}>'
     if 'src' in d:   d['file'] = d.pop('src')
     return '{% include image.html ' + h.attrs2str() + ' %}'
 
@@ -263,7 +267,7 @@ def add_show_docs(cells, cls_lvl=None):
         res.append(cell)
         if check_re(cell, _re_export):
             for n in export_names(cell['source'], func_only=True):
-                if not n in documented: res.insert(len(res)-1, _show_doc_cell(n, cls_lvl=cls_lvl))
+                if n not in documented: res.insert(len(res)-1, _show_doc_cell(n, cls_lvl=cls_lvl))
     return res
 
 # Cell
@@ -324,10 +328,9 @@ def get_metadata(cells):
     "Find the cell with title and summary in `cells`."
     for i,cell in enumerate(cells):
         if cell['cell_type'] == 'markdown':
-            match = _re_title_summary.match(cell['source'])
-            if match:
+            if match := _re_title_summary.match(cell['source']):
                 cells.pop(i)
-                attrs = {k:v for k,v in _re_properties.findall(cell['source'])}
+                attrs = dict(_re_properties.findall(cell['source']))
                 return {'keywords': 'fastai',
                         'summary' : _md2html_links(match.groups()[1]),
                         'title'   : match.groups()[0],
@@ -335,7 +338,7 @@ def get_metadata(cells):
             elif _re_title_only.search(cell['source']) is not None:
                 title = _re_title_only.search(cell['source']).groups()[0]
                 cells.pop(i)
-                attrs = {k:v for k,v in _re_properties.findall(cell['source'])}
+                attrs = dict(_re_properties.findall(cell['source']))
                 return {'keywords': 'fastai',
                         'title'   : title,
                         **attrs}
@@ -387,7 +390,7 @@ class ExecuteShowDocPreprocessor(ExecutePreprocessor):
 # Cell
 def _import_show_doc_cell(mods=None):
     "Add an import show_doc cell."
-    source = f"from nbdev.showdoc import show_doc"
+    source = "from nbdev.showdoc import show_doc"
     if mods is not None:
         for mod in mods: source += f"\nfrom {get_config().lib_name}.{mod} import *"
     return {'cell_type': 'code',
@@ -418,8 +421,7 @@ def _textcite2link(text):
     for cit_group in citations:
         cit_pos_st =  cit_group.span()[0]
         cit_pos_fin =  cit_group.span()[1]
-        out.append(text[start_pos:cit_pos_st])
-        out.append('[')
+        out.extend((text[start_pos:cit_pos_st], '['))
         cit_group = cit_group[2].split(',')
         for i, cit in enumerate(cit_group):
             cit=cit.strip()
@@ -541,7 +543,8 @@ def notebook2html(fname=None, force_all=False, n_workers=None, cls=HTMLExporter,
 def convert_md(fname, dest_path, img_path='docs/images/', jekyll=True):
     "Convert a notebook `fname` to a markdown file in `dest_path`."
     fname = Path(fname).absolute()
-    if not img_path: img_path = fname.stem + '_files/'
+    if not img_path:
+        img_path = f'{fname.stem}_files/'
     Path(img_path).mkdir(exist_ok=True, parents=True)
     nb = read_nb(fname)
     meta_jekyll = get_metadata(nb['cells'])
@@ -556,7 +559,7 @@ def convert_md(fname, dest_path, img_path='docs/images/', jekyll=True):
     export = exp.from_notebook_node(nb, resources=meta_jekyll)
     md = export[0]
     for ext in ['png', 'svg']:
-        md = re.sub(r'!\['+ext+'\]\((.+)\)', '!['+ext+'](' + img_path + '\\1)', md)
+        md = re.sub(r'!\['+ext+'\]\((.+)\)', f'![{ext}]({img_path}' + '\\1)', md)
     with (Path(dest_path)/dest_name).open('w') as f: f.write(md)
     if hasattr(export[1]['outputs'], 'items'):
         for n,o in export[1]['outputs'].items():

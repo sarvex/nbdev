@@ -109,7 +109,7 @@ def nbdev_new():
     FILES_URL = f"https://github.com/fastai/nbdev_template/archive/{tgnm}.tar.gz"
     extract_tgz(FILES_URL)
     path = Path()
-    nbexists = True if first(path.glob('*.ipynb')) else False
+    nbexists = bool(first(path.glob('*.ipynb')))
     for o in (path/f'nbdev_template-{tgnm}').ls():
         if o.name == '00_core.ipynb':
             if not nbexists: shutil.move(str(o), './')

@@ -20,7 +20,8 @@ def extract_cells(raw_txt):
         j = i
         while not lines[j].startswith('  }'): j+=1
         c = '\n'.join(lines[i:j+1])
-        if not c.endswith(','): c = c + ','
+        if not c.endswith(','):
+            c += ','
         cells.append(c)
         i = j+1
     end = '\n'.join(lines[i:])

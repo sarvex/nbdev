@@ -38,8 +38,10 @@ def create_config(host, lib_name, user, path='.', cfg_name='settings.ini', branc
                doc_host="https://%(user)s.github.io", doc_baseurl="/%(lib_name)s/", **kwargs):
     "Creates a new config file for `lib_name` and `user` and saves it."
     g = locals()
-    config = {o:g[o] for o in 'host lib_name user branch git_url lib_path nbs_path doc_path recursive tst_flags version custom_sidebar'.split()}
-    config = {**config, **kwargs}
+    config = {
+        o: g[o]
+        for o in 'host lib_name user branch git_url lib_path nbs_path doc_path recursive tst_flags version custom_sidebar'.split()
+    } | kwargs
     save_config_file(Path(path)/cfg_name, config)
 
 #export
